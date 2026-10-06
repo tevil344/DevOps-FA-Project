@@ -1,6 +1,9 @@
 # Secrets and local configuration
 .env
 .env.render
+.env.render.working
+backend/.env
+frontend/.env
 *.pem
 *.key
 
