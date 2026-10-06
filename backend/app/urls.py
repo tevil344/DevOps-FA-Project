@@ -2,6 +2,11 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls import handler404
 from django.conf.urls.static import static
+from django.http import HttpResponse, JsonResponse
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 # Import views for better organization
 from app.views import (
     # Authentication views
@@ -27,6 +32,16 @@ from app.views import (
 )
 
 handler404 = my_404_page
+
+@ensure_csrf_cookie
+def csrf(request):
+    """Issue a CSRF cookie for the React client before state-changing calls."""
+    return JsonResponse({'csrfToken': get_token(request)})
+
+@require_GET
+def metrics(request):
+    """Internal Prometheus scrape endpoint; Nginx deliberately does not publish it."""
+    return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
 
 urlpatterns = [
     path('',home,name="home"),
@@ -61,4 +76,6 @@ urlpatterns = [
 
     # Health check for Render monitoring
     path('api/health/', health_check, name='health_check'),
+    path('api/csrf/', csrf, name='csrf'),
+    path('metrics', metrics, name='metrics'),
 ]

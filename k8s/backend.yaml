@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cropleaf
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cropleaf
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/REPLACE_WITH_YOUR_ORG/cropleaf-backend:REPLACE_WITH_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: cropleaf-config
+            - secretRef:
+                name: cropleaf-secrets
+          readinessProbe:
+            httpGet: {path: /api/health/, port: 8000}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/health/, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: {cpu: "500m", memory: "1Gi"}
+            limits: {cpu: "1", memory: "2Gi"}

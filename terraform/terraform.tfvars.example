@@ -1,0 +1,5 @@
+# Never commit terraform.tfvars. Copy and customise this file.
+aws_region    = "ap-south-1"
+key_name      = "fa1-key"
+admin_cidr    = "YOUR.PUBLIC.IP.ADDRESS/32"
+instance_type = "t3.medium"

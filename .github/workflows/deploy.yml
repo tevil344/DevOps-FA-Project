@@ -1,0 +1,47 @@
+name: CD - Deploy CropLeaf
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: "Git ref already validated by CI"
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Ansible
+        run: pip install ansible-core
+      - name: Install required Ansible collection
+        run: ansible-galaxy collection install -r ansible/collections/requirements.yml
+      - name: Configure SSH and protected inventory
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ANSIBLE_INVENTORY: ${{ secrets.ANSIBLE_INVENTORY }}
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s' "$ANSIBLE_INVENTORY" > ansible/inventory.ini
+          printf '%s' "$ANSIBLE_VAULT_PASSWORD" > /tmp/vault-password
+          chmod 600 /tmp/vault-password
+      - name: Deploy validated revision
+        run: |
+          ansible-playbook -i ansible/inventory.ini ansible/deploy.yml \
+            --extra-vars "app_version=${{ inputs.revision }}" \
+            --vault-password-file /tmp/vault-password

@@ -1,0 +1,13 @@
+app_dir: /opt/cropleaf
+app_repo: https://github.com/tevil344/DevOps-FA-Project.git
+app_version: main
+
+# Store real values in an Ansible Vault file, not in Git.
+postgres_password: CHANGE_ME_TO_A_LONG_RANDOM_VALUE
+django_secret_key: CHANGE_ME_TO_A_DJANGO_SECRET
+allowed_hosts: YOUR_EC2_PUBLIC_IP
+csrf_trusted_origins: http://YOUR_EC2_PUBLIC_IP
+
+# Optional secured ML sources.
+tf_model_url: ""
+pt_model_url: ""

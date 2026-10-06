@@ -110,12 +110,15 @@ PT_MODEL_FILE = ML_MODELS_DIR / PT_MODEL_FILENAME
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-l8**w9!+h)4(8wdl!w#y)h35khdnbec5marktpz#%wz&i4+ooj')
+# Secrets must come from the environment in deployed environments. The fallback
+# keeps a first local run possible but is never acceptable for cloud deployment.
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-local-development-only-change-me')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = ["cropleaf.onrender.com", "brilliant-flan-b6a0dd.netlify.app", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [host.strip() for host in os.getenv(
+    'ALLOWED_HOSTS', 'localhost,127.0.0.1'
+).split(',') if host.strip()]
 
 # Application definition
 
@@ -133,17 +136,17 @@ INSTALLED_APPS = [
 ]
 
 
-RECAPTCHA_PUBLIC_KEY = '6LeApmMrAAAAANKwRdcDDO9jybdrN1EX7EyxdAfq'
-
-RECAPTCHA_PRIVATE_KEY = '6LeApmMrAAAAAK3WKQP-hZR0r5rFrm5SHLlkl1jA'
+RECAPTCHA_PUBLIC_KEY = os.getenv('RECAPTCHA_PUBLIC_KEY', '')
+RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY', '')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'app.observability.PrometheusMetricsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',  # Temporarily disabled for API
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -255,29 +258,17 @@ CSP_FRAME_SRC = ("'self'", "https://translate.google.com")
 # export TF_CPP_MIN_LOG_LEVEL=2
 # set TF_ENABLE_ONEDNN_OPTS=0
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-    'http://192.168.1.13:5173',
-    'https://cropleaf.onrender.com',
-    'https://brilliant-flan-b6a0dd.netlify.app',
-]
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
+    'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000'
+).split(',') if origin.strip()]
 
-# Allow all origins for testing (remove in production)
-CORS_ALLOW_ALL_ORIGINS = True
+# Do not combine credentialed requests with a wildcard origin.
+CORS_ALLOW_ALL_ORIGINS = False
 
 # CSRF trusted origins for Django 4.0+
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-    'http://192.168.1.13:5173',
-    'https://cropleaf.onrender.com',
-    'https://brilliant-flan-b6a0dd.netlify.app',
-]
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv(
+    'CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://localhost:3000'
+).split(',') if origin.strip()]
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -307,3 +298,12 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [],
 }
+
+# Browser traffic is HTTPS-terminated by a reverse proxy in cloud deployments.
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'false').lower() == 'true'
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'false').lower() == 'true'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'

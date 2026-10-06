@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { getTranslation } from '../translations';
 
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  return parts.length === 2 ? parts.pop().split(';').shift() : '';
+};
+
 const UserAuth = ({ onAuthSuccess, language = 'en' }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
@@ -38,10 +44,14 @@ const UserAuth = ({ onAuthSuccess, language = 'en' }) => {
             name: formData.name
           };
 
-      const response = await fetch(`http://localhost:8000${endpoint}`, {
+      // Ask Django for its CSRF cookie, then send it with the authentication POST.
+      // Relative URLs work locally through Vite and in Docker through Nginx.
+      await fetch('/api/csrf/', { credentials: 'include' });
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
         },
         body: JSON.stringify(payload),
         credentials: 'include',

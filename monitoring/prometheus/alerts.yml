@@ -1,0 +1,22 @@
+groups:
+  - name: cropleaf-sre
+    rules:
+      - alert: CropLeafBackendDown
+        expr: up{job="cropleaf-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CropLeaf backend scrape target is down"
+          runbook: "docs/SRE_RUNBOOK.md#backend-down"
+      - alert: CropLeafHigh5xxRate
+        expr: |
+          sum(rate(cropleaf_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(cropleaf_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 5% of CropLeaf requests are returning 5xx"
+          runbook: "docs/SRE_RUNBOOK.md#high-5xx-rate"

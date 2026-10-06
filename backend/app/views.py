@@ -13,14 +13,15 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden , HttpResponse
+from django.http import HttpResponseForbidden , HttpResponse, JsonResponse
 from django.shortcuts import render , redirect , get_object_or_404
 from app.forms import RegistrationForm , ProfileEditForm , ContactForm
 from django.contrib.auth import  login as auth_login , authenticate , logout
 from app.utils import anonymous_required , crop , developers , disease_class, small_image_size, under_maintenance , process_image
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
+from django.middleware.csrf import get_token
 from rest_framework.response import Response
 
 tf.config.set_visible_devices([], 'GPU') # i have to comment down before deployement
@@ -75,7 +76,6 @@ except Exception as e:
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
-@csrf_exempt
 def predict_simple(request):
     """Robust prediction endpoint with comprehensive error handling"""
     try:
@@ -1079,7 +1079,7 @@ def farmer_dashboard(request):
             'error': f'Error retrieving farmer dashboard: {str(e)}'
         }, status=500)
 
-@csrf_exempt
+@csrf_protect
 def api_login(request):
     """
     API endpoint for user login
@@ -1088,17 +1088,9 @@ def api_login(request):
         return HttpResponse('{"error": "Method not allowed"}', status=405, content_type='application/json')
 
     try:
-        # Debug: Print request details
-        print(f"Request method: {request.method}")
-        print(f"Request content type: {request.content_type}")
-        print(f"Request body: {request.body}")
-        print(f"Request body type: {type(request.body)}")
-        print(f"Request body length: {len(request.body)}")
-
         # Parse JSON manually
         try:
             body_str = request.body.decode('utf-8')
-            print(f"Decoded body: {body_str}")
 
             # Handle malformed JSON from frontend (JavaScript object notation)
             if body_str.startswith("'") and body_str.endswith("'"):
@@ -1108,17 +1100,11 @@ def api_login(request):
                 import re
                 body_str = re.sub(r'(\w+):', r'"\1":', body_str)  # Add quotes around keys
                 body_str = re.sub(r':(\w+)', r':"\1"', body_str)  # Add quotes around unquoted values
-                print(f"Fixed body: {body_str}")
-
             data = json.loads(body_str)
             username = data.get('username', '').strip()
             password = data.get('password', '')
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            print(f"JSON decode error: {e}")
-            print(f"Raw body: {request.body}")
             return HttpResponse('{"error": "Invalid JSON format"}', status=400, content_type='application/json')
-
-        print(f"Username: {username}, Password: {'*' * len(password) if password else 'None'}")
 
         if not username or not password:
             return HttpResponse('{"error": "Username and password are required"}', status=400, content_type='application/json')
@@ -1164,8 +1150,8 @@ def api_login(request):
         print(f"Traceback: {traceback.format_exc()}")
         return HttpResponse(f'{{"error": "Login failed: {str(e)}"}}', status=500, content_type='application/json')
 
-@csrf_exempt
 @api_view(['POST'])
+@csrf_protect
 def api_register(request):
     """
     API endpoint for user registration
@@ -1175,22 +1161,15 @@ def api_register(request):
         from app.models import FarmerProfile
         import json
 
-        # Handle JSON parsing manually for Django REST framework
-        print(f"Request method: {request.method}")
-        print(f"Request body: {request.body}")
-        print(f"Content-Type: {request.META.get('CONTENT_TYPE')}")
-
+        # Parse request data without logging it: it contains a password.
         if hasattr(request, 'body') and request.body:
             try:
                 data = json.loads(request.body.decode('utf-8'))
-                print(f"Parsed JSON data: {data}")
             except json.JSONDecodeError as e:
-                print(f"JSON decode error: {e}")
                 return Response({'error': 'Invalid JSON format'}, status=400)
         else:
             # Fallback for form data
             data = request.POST.dict()
-            print(f"Using POST data: {data}")
 
         form = RegistrationForm(data)
         if form.is_valid():
@@ -1935,21 +1914,17 @@ def health_check(request):
     """
     try:
         from django.db import connection
-        from app.model import ModelWrapper
-
         # Check database connection
         cursor = connection.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchone()
 
-        # Check ML model loading
-        model_wrapper = ModelWrapper()
-        models_loaded = model_wrapper.check_models_loaded()
-
         return Response({
             'status': 'healthy',
             'database': 'connected',
-            'ml_models': 'loaded' if models_loaded else 'loading',
+            # Models may be delivered after the container starts. They are not a
+            # dependency for this readiness probe and must not be reloaded here.
+            'ml_models': 'available' if (tf_model is not None or pt_model is not None) else 'unavailable',
             'timestamp': datetime.now().isoformat(),
             'version': '1.0.0'
         })

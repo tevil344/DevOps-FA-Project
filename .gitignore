@@ -1,0 +1,28 @@
+# Secrets and local configuration
+.env
+*.pem
+*.key
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.sqlite3
+backend/staticfiles/
+backend/media/uploads/
+
+# Node and build output
+frontend/node_modules/
+frontend/dist/
+
+# Terraform state can contain infrastructure identifiers and secrets
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+
+# Kubernetes runtime secret (the example is safe to keep)
+k8s/secret.yaml
+
+# Model binaries are supplied through secure object storage or a mounted volume
+backend/app/ml_models/*.h5
+backend/app/ml_models/*.pt
